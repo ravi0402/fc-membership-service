@@ -1,0 +1,36 @@
+# Runs the membership service against PostgreSQL (production-like profile).
+# For a zero-setup demo you can instead run `mvn spring-boot:run` (in-memory H2).
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fc-membership-postgres
+    environment:
+      POSTGRES_DB: membership
+      POSTGRES_USER: membership
+      POSTGRES_PASSWORD: membership
+    ports:
+      - "5432:5432"
+    volumes:
+      - membership-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U membership -d membership"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  membership-service:
+    build: .
+    container_name: fc-membership-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/membership
+      SPRING_DATASOURCE_USERNAME: membership
+      SPRING_DATASOURCE_PASSWORD: membership
+    ports:
+      - "8080:8080"
+
+volumes:
+  membership-pg-data:

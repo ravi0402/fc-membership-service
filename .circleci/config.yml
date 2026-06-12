@@ -1,0 +1,32 @@
+version: 2.1
+
+jobs:
+  build-and-test:
+    docker:
+      - image: cimg/openjdk:21.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-deps-{{ checksum "pom.xml" }}
+            - v1-deps-
+      - run:
+          name: Resolve dependencies
+          command: mvn -B -q dependency:go-offline
+      - save_cache:
+          key: v1-deps-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2
+      - run:
+          name: Build & test
+          command: mvn -B clean verify
+      - store_test_results:
+          path: target/surefire-reports
+      - store_artifacts:
+          path: target/fc-membership-service-1.0.0.jar
+          destination: fc-membership-service.jar
+
+workflows:
+  ci:
+    jobs:
+      - build-and-test
