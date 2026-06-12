@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  build:
+    name: Lint, Verify & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Validate (POM & project sanity)
+        run: mvn -B -ntp validate
+
+      - name: Lint (compile with warnings & deprecation)
+        run: >
+          mvn -B -ntp clean compile
+          -Dmaven.compiler.showWarnings=true
+          -Dmaven.compiler.showDeprecation=true
+
+      - name: Verify (build, unit & integration tests)
+        run: mvn -B -ntp verify
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v1
+        if: ${{ !cancelled() }}
+        with:
+          name: Maven Tests
+          path: target/surefire-reports/*.xml
+          reporter: java-junit
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          retention-days: 7
+
+      - name: Upload packaged JAR
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: fc-membership-service-jar
+          path: target/fc-membership-service-*.jar
+          retention-days: 7
